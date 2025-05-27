@@ -25,3 +25,16 @@ pipeline {
         }
     }
 }
+pipeline {
+    agent any
+    parameters {
+        choice(
+            name: 'ENV',
+            choices: ['dev', 'prod'],
+            description: 'Выбор окружения для деплоя'
+        )
+    }
+    stages {
+        // Ваши этапы
+    }
+}
