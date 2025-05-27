@@ -7,7 +7,7 @@ pipeline {
         stage('Deploy') {
             steps {
                 echo "Deploying to ${params.ENV}"
-                cleanWs()
+                deleteDir() // Альтернатива cleanWs()
                 sshPublisher(
                     publishers: [
                         sshPublisherDesc(
@@ -23,18 +23,5 @@ pipeline {
                 )
             }
         }
-    }
-}
-pipeline {
-    agent any
-    parameters {
-        choice(
-            name: 'ENV',
-            choices: ['dev', 'prod'],
-            description: 'Выбор окружения для деплоя'
-        )
-    }
-    stages {
-        // Ваши этапы
     }
 }
