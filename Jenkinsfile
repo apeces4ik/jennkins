@@ -10,10 +10,23 @@ pipeline {
         skipDefaultCheckout(false)
     }
     environment {
-        // Правильное объявление переменных окружения
-        AUTO_ENV = "${BRANCH_NAME == 'main' ? 'prod' : 'dev'}"
+        AUTO_ENV = "dev" // значение по умолчанию
     }
     stages {
+        stage('Initialize') {
+            steps {
+                script {
+                    // Получаем имя ветки если не установлено
+                    env.BRANCH_NAME = env.BRANCH_NAME ?: sh(
+                        script: 'git rev-parse --abbrev-ref HEAD',
+                        returnStdout: true
+                    ).trim()
+                    
+                    // Обновляем AUTO_ENV на основе ветки
+                    env.AUTO_ENV = (env.BRANCH_NAME == 'main') ? 'prod' : 'dev'
+                }
+            }
+        }
         stage('Checkout') {
             steps {
                 checkout scm
@@ -22,14 +35,10 @@ pipeline {
         stage('Deploy') {
             steps {
                 script {
-                    // Определяем целевое окружение
                     def targetEnv = params.ENV ?: env.AUTO_ENV
                     echo "Deploying to ${targetEnv}"
-                    
-                    // Очищаем рабочую директорию
                     deleteDir()
                     
-                    // Деплоим через SSH
                     sshPublisher(
                         publishers: [
                             sshPublisherDesc(
@@ -38,7 +47,10 @@ pipeline {
                                     sshTransfer(
                                         sourceFiles: '**/*',
                                         remoteDirectory: "/var/www/${targetEnv}",
-                                        execCommand: "echo 'Deployed to ${targetEnv}'"
+                                        execCommand: """
+                                            echo 'Successfully deployed to ${targetEnv}'
+                                            systemctl restart ${targetEnv}-service
+                                        """
                                     )
                                 ]
                             )
@@ -46,6 +58,16 @@ pipeline {
                     )
                 }
             }
+        }
+    }
+    post {
+        success {
+            slackSend channel: '#deployments',
+                      message: "✅ Deployed ${env.JOB_NAME} to ${targetEnv}"
+        }
+        failure {
+            slackSend channel: '#errors',
+                      message: "❌ FAILED: ${env.JOB_NAME} to ${targetEnv}"
         }
     }
 }
